@@ -1,0 +1,1 @@
+This repo currently contains two VSPA (Vector Signal Processing Accelerator) kernels for the NXP LA9310 Baseband Processor. Both kernels do BPSK modulation, however one (psk_hw) uses internal hardware for BPSK modulation and the other (psk) uses standard vector operations. 
