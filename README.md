@@ -5,5 +5,5 @@ Simulator results:\
 =======================\
 BPSK vectorized non-accelerated - 1084 cycles\
 BPSK vectorized accelerated - 96 cycles\
-QPSK vectorized accelerated - 99 cycles\
+QPSK vectorized accelerated - 99 cycles
 
