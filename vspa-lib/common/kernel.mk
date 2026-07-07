@@ -51,13 +51,14 @@ VCFLAGS = \
 
 all: $(TARGET)
 
+# Always regenerate vectors before building -- generation is cheap, and this
+# avoids silently reusing stale vectors from a previous QAM_MODE (or other
+# env-driven gen_vectors.py variant) after switching without `make clean`.
+.PHONY: generate
 generate:
 	python3 gen_vectors.py
 
-vectors/input.hex: gen_vectors.py
-	$(MAKE) generate
-
-$(TARGET): $(SRCS) vectors/input.hex
+$(TARGET): $(SRCS) generate
 	@mkdir -p $(BUILD_DIR)
 	$(VSPA_CC) $(VCFLAGS) \
 	    -mem $(VSPA_TOOL)/etc/$(ARCH)_$(AU)au/lcf/$(ARCH)_$(AU)au_$(CORE).lcf \
