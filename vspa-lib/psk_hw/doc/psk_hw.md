@@ -29,21 +29,6 @@ iowr(LD_RF_CONTROL, <mode>);           // 1=BPSK, 2=QPSK, 4=16QAM, 6=64QAM (nibb
 iowr(LD_RF_TB_REAL_0, <real coeffs>);  // only some modes need this, see below
 iowr(LD_RF_TB_IMAG_0, <imag coeffs>);
 ```
-
-### Why BPSK/QPSK write coefficients but 16-QAM doesn't
-
-A note on `LD_RF_CONTROL`'s mode field:
-
-> Writing anything other than 6, 8 or 10 to the mode bits will
-> automatically update the `LD_RF_TB_REAL_0` and `LD_RF_TB_IMAG_0`
-> registers to 16QAM values. Writing 6 will automatically update these
-> registers to 64QAM values.
-
-Setting mode to 1, 2, or 4 always auto-loads the 16-QAM default
-coefficients as a side effect. BPSK/QPSK overwrite them right after
-because those defaults are wrong for their smaller alphabets. 16-QAM
-doesn't, because the auto-loaded defaults are already correct for it.
-
 ### The coefficient values
 
 Two independent layers. First, for `M <= 4`, each coefficient slot is a
