@@ -4,5 +4,6 @@ This repo currently contains two VSPA (Vector Signal Processing Accelerator) ker
 Simulator results:\
 =======================\
 BPSK vectorized non-accelerated - 1084 cycles\
-BPSK vectorized accelerated - 96 cycles
+BPSK vectorized accelerated - 96 cycles\
+QPSK vectorized accelerated - 99 cycles\
 
