@@ -1,26 +1,47 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// bpsk_hw kernel test harness -- validates the ld.qam hardware-accelerator
-// path (see kernel/psk_hw.c) against the same packed-bit / cfloat16
-// convention as NXP's own qamModBpsk
-// (la931x_vspa_common/vspa-lib/qam/tests/test_qam.c): N is a *line count*,
-// not a bit count -- each line packs 32 bits into one input word and
-// produces 32 cfloat16 output symbols. This test uses N=1 (one packed
-// word in, 32 symbols out) since it's only probing whether ld.qam's
-// constellation mapping itself is correct, not throughput.
+// ld.qam hardware-accelerator kernel test harness -- Python-oracle driven,
+// mirroring la931x_vspa_common/vspa-lib/qam/tests/test_qam.c's dispatch
+// pattern (mode selected at compile time via -DQAM_MODE=<token>).
 //
-// Reference is raw, unscaled bit -> -1/+1 (imag=0), packed as cfloat16
-// ((imag_fp16<<16) | real_fp16) -- see gen_vectors.py.
+// Unlike test_qam.c (which sizes N_LINES per mode for throughput testing),
+// this always uses N_LINES=1 -- these tests only probe whether ld.qam's
+// constellation mapping itself is correct, not throughput. See
+// gen_vectors.py for the matching vector generation.
+//
+// Each output cfloat16 packs as (imag_fp16<<16) | real_fp16 in one uint32;
+// compared uint32-wise against ref.hex via vspa_array_cmp.
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <vspa/intrinsics.h>
 #include "test_utils.h"
 
-extern void mod_bpsk_hw(unsigned int *bit_in, vspa_complex_float16 *bpsk_out, unsigned int N);
+// kernel entry points (see kernel/psk_hw.c).
+extern void mod_bpsk_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, unsigned int N);
+extern void mod_qpsk_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, unsigned int N);
 
-#define N_LINES        1
-#define N_INPUT_WORDS  1
-#define N_OUT_SYMBOLS  32
+// Mode tokens -- mirror QAM_MODE values produced by the Makefile -D.
+#define QAM_MODE_BPSK     1
+#define QAM_MODE_QPSK     2
+
+#ifndef QAM_MODE
+#define QAM_MODE QAM_MODE_BPSK
+#endif
+
+#define N_LINES 1
+#define N_OUT_SYMBOLS (N_LINES * 32)
+
+// Per-mode geometry: must match gen_vectors.py (N_INPUT_WORDS = N_LINES * M).
+#if QAM_MODE == QAM_MODE_BPSK
+#  define N_INPUT_WORDS   1
+#  define QAM_MOD_FN      mod_bpsk_hw
+#elif QAM_MODE == QAM_MODE_QPSK
+#  define N_INPUT_WORDS   2
+#  define QAM_MOD_FN      mod_qpsk_hw
+#else
+#  error "Unknown QAM_MODE"
+#endif
 
 // Compile-time-baked vectors from gen_vectors.py.
 static const unsigned int INPUT_DATA[N_INPUT_WORDS] = {
@@ -31,9 +52,8 @@ static const unsigned int REF_DATA[N_OUT_SYMBOLS] = {
 #include "vectors/ref.hex"
 };
 
-// cwproj-aligned BSS buffers -- vector-aligned, zero on entry to main().
 _VSPA_VECTOR_ALIGN static unsigned int bitIn[N_INPUT_WORDS];
-_VSPA_VECTOR_ALIGN static unsigned int bpskOut[N_OUT_SYMBOLS];
+_VSPA_VECTOR_ALIGN static unsigned int qamOut[N_OUT_SYMBOLS];
 
 int main(void)
 {
@@ -44,8 +64,8 @@ int main(void)
 
     KCYC_INIT();
     KCYC_START();
-    mod_bpsk_hw(bitIn, (vspa_complex_float16 *)bpskOut, (unsigned int)N_LINES);
+    QAM_MOD_FN(bitIn, (vspa_complex_float16 *)qamOut, (unsigned int)N_LINES);
     KCYC_STOP_PRINT();
 
-    return vspa_array_cmp(bpskOut, REF_DATA, N_OUT_SYMBOLS);
+    return vspa_array_cmp(qamOut, REF_DATA, N_OUT_SYMBOLS);
 }

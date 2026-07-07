@@ -1,72 +1,72 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""BPSK-via-ld.qam vector generator.
+"""ld.qam hardware-accelerator vector generator, using ../python/model.py
+(vendored from la931x_vspa_common/vspa-lib/qam/python/model.py) -- the same
+oracle NXP's own qam/tests/gen_vectors.py relies on.
 
-Mirrors la931x_vspa_common/vspa-lib/qam/tests: N is a *line count*, not a
-bit count. One line = 32 packed bits in = 32 cfloat16 symbols out. This
-generates N_LINES=1 worth of vectors (one input word, 32 output symbols).
-
-Reference follows qam/python/model.py's BPSK oracle: map_table[bit] =
-{-1, +1}, then multiplied by BPSK's norm_u32 (0x3F800000 == 1.0f exactly),
-so the reference reduces to raw, unscaled bit -> -1/+1, imag=0 -- no
-headroom scaling like mod_bpsk's, since this test is only probing whether
-ld.qam's constellation mapping itself is correct.
-
-This intentionally matches qamModBpsk's own convention (packed-bit input,
-cfloat16 packed output) rather than mod_bpsk's (one float per bit,
-half-fixed output) -- ld.qam consumes packed bits and its Vprec here is
-half (IEEE fp16), not half-fixed.
+Unlike the real qam/tests (which generate N_LINES per mode for throughput
+testing), this always generates N_LINES=1 -- these tests only probe whether
+ld.qam's constellation mapping itself is correct, not throughput.
 """
 
 from __future__ import annotations
 
-import random
+import os
 import sys
 from pathlib import Path
 
 _TESTS_DIR = Path(__file__).resolve().parent
-_COMMON_PY = _TESTS_DIR.parent.parent / 'common' / 'python'
-if str(_COMMON_PY) not in sys.path:
-    sys.path.insert(0, str(_COMMON_PY))
+_KERNEL_DIR = _TESTS_DIR.parent
+_COMMON_PY = _KERNEL_DIR.parent / 'common' / 'python'
+
+for p in (str(_COMMON_PY), str(_KERNEL_DIR / 'python')):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+from model import QAM_MODES, r_qam_mod
+from utils.hex_io import write_hex_u32
 
 import numpy as np
-from vspa.arith import r_half_flt
+
+TOKEN_TO_MODE = {
+    'BPSK': 'bpsk',
+    'QPSK': 'qpsk',
+    '16QAM': '16qam',
+    '64QAM': '64qam',
+    '256QAM': '256qam',
+    '1024QAM': '1024qam',
+}
 
 N_LINES = 1
-N_BITS = N_LINES * 32  # one packed word per line
-SEED = 20260706
+SEED_BASE = 20260706
 
 OUTDIR = _TESTS_DIR / 'vectors'
 
 
-def pack_cfloat16(real: float, imag: float) -> int:
-    """Pack (real, imag) as fp16 into one uint32: (imag << 16) | real."""
-    re16 = np.float16(r_half_flt(real))
-    im16 = np.float16(r_half_flt(imag))
-    re_bits = int(np.frombuffer(re16.tobytes(), dtype='<u2')[0])
-    im_bits = int(np.frombuffer(im16.tobytes(), dtype='<u2')[0])
-    return (im_bits << 16) | re_bits
-
-
 def main() -> None:
-    rng = random.Random(SEED)
-    bits = [rng.randint(0, 1) for _ in range(N_BITS)]
+    token = os.environ.get('QAM_MODE', 'BPSK').upper()
+    if token not in TOKEN_TO_MODE:
+        raise SystemExit(f'unknown QAM_MODE={token!r}, expected one of {sorted(TOKEN_TO_MODE)}')
 
-    word = 0
-    for i, b in enumerate(bits):
-        word |= (b << i)  # LSB-first packing, matching ld.qam's bit order
+    mode = TOKEN_TO_MODE[token]
+    m_bits = QAM_MODES[mode]['M']
+    n_symbols = N_LINES * 32
+    n_input_words = (n_symbols * m_bits) // 32
+
+    seed = SEED_BASE + sum(ord(c) for c in token)
+    rng = np.random.default_rng(seed=seed)
+    bits_u32 = rng.integers(0, 1 << 32, size=n_input_words, dtype=np.uint64).astype(np.uint32)
+
+    ref_u32 = r_qam_mod(bits_u32, mode)
+    if ref_u32.size != n_symbols:
+        raise SystemExit(f'oracle size mismatch: got {ref_u32.size}, expected {n_symbols}')
 
     OUTDIR.mkdir(parents=True, exist_ok=True)
+    write_hex_u32(bits_u32, str(OUTDIR / 'input.hex'))
+    write_hex_u32(ref_u32, str(OUTDIR / 'ref.hex'))
 
-    with open(OUTDIR / 'input.hex', 'w') as f:
-        f.write(f'0x{word:08X},\n')
-
-    with open(OUTDIR / 'ref.hex', 'w') as f:
-        for b in bits:
-            real = 1.0 if b else -1.0
-            f.write(f'0x{pack_cfloat16(real, 0.0):08X},\n')
-
-    print(f'Generated N_LINES={N_LINES} ({N_BITS} bits, 1 packed word) -> vectors/input.hex, vectors/ref.hex')
+    print(f'Generated qam_hw vectors: mode={token} N_LINES={N_LINES} '
+          f'(input_words={n_input_words}, ref_symbols={n_symbols})')
 
 
 if __name__ == '__main__':
