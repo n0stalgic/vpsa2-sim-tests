@@ -20,6 +20,7 @@
 // kernel entry points (see kernel/psk_hw.c).
 extern void mod_bpsk_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, unsigned int N);
 extern void mod_qpsk_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, unsigned int N);
+extern void mod_16qam_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, unsigned int N);
 
 // Mode tokens -- mirror QAM_MODE values produced by the Makefile -D.
 #define QAM_MODE_BPSK     1
@@ -39,6 +40,9 @@ extern void mod_qpsk_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, uns
 #elif QAM_MODE == QAM_MODE_QPSK
 #  define N_INPUT_WORDS   2
 #  define QAM_MOD_FN      mod_qpsk_hw
+#elif QAM_MODE == QAM_MODE_QAM16
+#  define N_INPUT_WORDS   4
+#  define QAM_MOD_FN      mod_16qam_hw
 #else
 #  error "Unknown QAM_MODE"
 #endif

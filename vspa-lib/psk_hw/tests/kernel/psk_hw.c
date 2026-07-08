@@ -21,6 +21,37 @@
 
 #pragma optimization_level 0
 
+void mod_16qam_hw(uint32_t *bit_in, vspa_complex_float16* pam16_out, uint32_t N)
+{
+	iowr(LD_RF_CONTROL, QAM_16);
+
+	__clr_VRA();
+	__set_creg(255, 0);
+	__set_prec(single, half_fixed, half_fixed, single, half);
+	__set_Smode(S0hword, S1straight, S2zeros);
+	
+	__set_VRAptr_rV(_VR0);
+	__mv_w_rV(QAM_NORMALIZATION_16);
+	__set_VRAptr_rS0(_VR0);
+	__rd_S0();
+
+	__set_VRAptr_rS1(_VR2);
+	
+	__rd_S2();
+	
+	__set_VRAptr_rSt(0);
+
+	for (uint32_t i = 0; i < N; i++)
+	{
+		__ld_vec(bit_in + i);
+		__ld_Rx(qam, 2);
+		__rd_S1();
+		__rmad();
+		__wr(straight);
+		__st_vec((vspa_vector_pair_float16 *) pam16_out + i);
+	}
+}
+
 
 void mod_qpsk_hw(uint32_t *bit_in, vspa_complex_float16* qpsk_out, uint32_t N)
 {
