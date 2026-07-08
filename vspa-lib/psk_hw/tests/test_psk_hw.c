@@ -25,23 +25,26 @@ extern void mod_16qam_hw(unsigned int *bit_in, vspa_complex_float16 *qam_out, un
 // Mode tokens -- mirror QAM_MODE values produced by the Makefile -D.
 #define QAM_MODE_BPSK     1
 #define QAM_MODE_QPSK     2
+#define QAM_MODE_16QAM    4
 
 #ifndef QAM_MODE
 #define QAM_MODE QAM_MODE_BPSK
 #endif
 
-#define N_LINES 1
+// >1 on purpose: exercises unaligned per-line __ld_vec addresses. Must match
+// gen_vectors.py.
+#define N_LINES 4
 #define N_OUT_SYMBOLS (N_LINES * 32)
 
 // Per-mode geometry: must match gen_vectors.py (N_INPUT_WORDS = N_LINES * M).
 #if QAM_MODE == QAM_MODE_BPSK
-#  define N_INPUT_WORDS   1
+#  define N_INPUT_WORDS   (N_LINES * 1)
 #  define QAM_MOD_FN      mod_bpsk_hw
 #elif QAM_MODE == QAM_MODE_QPSK
-#  define N_INPUT_WORDS   2
+#  define N_INPUT_WORDS   (N_LINES * 2)
 #  define QAM_MOD_FN      mod_qpsk_hw
-#elif QAM_MODE == QAM_MODE_QAM16
-#  define N_INPUT_WORDS   4
+#elif QAM_MODE == QAM_MODE_16QAM
+#  define N_INPUT_WORDS   (N_LINES * 4)
 #  define QAM_MOD_FN      mod_16qam_hw
 #else
 #  error "Unknown QAM_MODE"

@@ -37,7 +37,7 @@ TOKEN_TO_MODE = {
     '1024QAM': '1024qam',
 }
 
-N_LINES = 1
+N_LINES = 4  # >1 on purpose: exercises unaligned per-line __ld_vec addresses
 SEED_BASE = 20260706
 
 OUTDIR = _TESTS_DIR / 'vectors'

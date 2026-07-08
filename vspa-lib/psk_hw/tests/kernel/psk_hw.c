@@ -43,7 +43,7 @@ void mod_16qam_hw(uint32_t *bit_in, vspa_complex_float16* pam16_out, uint32_t N)
 
 	for (uint32_t i = 0; i < N; i++)
 	{
-		__ld_vec(bit_in + i);
+		__ld_vec(bit_in + i*4);
 		__ld_Rx(qam, 2);
 		__rd_S1();
 		__rmad();
@@ -78,7 +78,7 @@ void mod_qpsk_hw(uint32_t *bit_in, vspa_complex_float16* qpsk_out, uint32_t N)
 
 	for (uint32_t i = 0; i < N; i++)
 	{
-		__ld_vec(bit_in + i);
+		__ld_vec(bit_in + i*2);
 		__ld_Rx(qam, 2);
 		__rd_S1();
 		__rmad();
